@@ -1,19 +1,20 @@
-# Calorie.AI 🍳 (YOLOv8 + Gemini API Calorie Tracker & Git Lab)
+# Macros AI 🍳 (YOLOv8 + Gemini API Smart Nutrition Tracker)
 
-Calorie.AI is a full-stack web application that combines computer vision and generative AI to estimate nutritional metrics from meal images. It is inspired by the sleek design aesthetics of **Cal.ai** (dark mode, glassmorphism, responsive navigation).
+Macros AI is a full-stack web application that combines computer vision and generative AI to locate food items on a plate, draw bounding boxes, and estimate nutritional metrics in real-time. It is inspired by the sleek design aesthetics of **Cal.ai** (dark mode, glassmorphism, responsive navigation).
 
-This project is specifically designed to help beginners:
+This project is specifically designed to help developers:
 1. Learn how to build a real-world Machine Learning web project.
-2. Master industry-standard **Git workflows** (`main`/`dev` branching, atomic commits, merging).
+2. Master industry-standard **Git workflows** (`main`/`dev` branching, atomic commits, merging, pushing).
 
 ---
 
 ## Technical Stack & How It Works
 
-1. **YOLOv8 Object Detection**: The Python backend loads the `ultralytics` YOLOv8 model (`yolov8n.pt`). When you upload a picture, the model locates food items on the plate and calculates relative bounding box coordinates `[x_min, y_min, x_max, y_max]`.
-2. **Gemini API Nutritionist**: The backend takes the image and YOLO-detected labels, sends them to the `gemini-2.5-flash` model, and prompts it to return structured JSON specifying calorie counts, macros, portions, and healthy recommendations.
-3. **Canvas Overlays**: The HTML5 canvas on the frontend loads the image and draws color-coded bounding boxes on top of the food items.
-4. **Interactive AI Coach**: A direct frontend chat interface allows you to chat with a nutrition coach that has complete context of your scanned meal.
+1. **YOLOv8 Object Detection (Localization)**: The Python backend loads the `ultralytics` YOLOv8 model (`yolov8n.pt`). When you upload a picture, the model runs locally on your machine to find the physical coordinates of objects in the image (plates, cups, food items) and outputs bounding boxes.
+2. **Gemini API Correction (Semantic Recognition)**: YOLO's raw detections are limited to 10 COCO food categories (e.g. labeling chicken as "pizza"). The backend sends the image and YOLO coordinates to the **Gemini 2.5 Flash API**. Gemini looks at the visual context, corrects YOLO's labels (e.g. correcting "pizza" -> "Grilled Chicken"), and estimates portions, calories, and macros.
+3. **Canvas Overlays**: The HTML5 canvas on the frontend draws the bounding boxes.
+4. **Show Raw YOLO Toggle**: A checkbox in the UI header lets you switch between viewing raw, local YOLOv8 detections (red boxes) and the Gemini-corrected food labels (green boxes).
+5. **AI Coach Chatbot**: A chat widget lets you discuss your logged meals directly with an AI nutrition coach.
 
 ---
 
@@ -21,7 +22,7 @@ This project is specifically designed to help beginners:
 
 ```
 ├── backend/
-│   └── main.py          # FastAPI Backend (YOLOv8 & Gemini API integration)
+│   └── main.py          # FastAPI Backend (YOLOv8 & Gemini API hybrid pipeline)
 ├── frontend/
 │   ├── index.html       # HTML5 dashboard and landing page
 │   ├── styles.css       # Custom glassmorphic styling
@@ -62,72 +63,65 @@ Ensure Python 3.10+ is installed.
    *The server will start at `http://localhost:8000`.*
 
 ### 2. Frontend Setup (HTML/CSS/JS)
-You do not need to install any npm packages for the frontend. It is a pure client-side application.
+You do not need to install any packages for the frontend. It is a pure client-side application.
 1. Open `frontend/index.html` directly in a browser (or run a local server in the project directory using `python -m http.server 8080` and open `http://localhost:8080`).
 2. Click **Open Dashboard**.
 3. Click the **Settings Gear (⚙️)** in the top right.
 4. Paste your **Gemini API Key** and save.
-5. Drag and drop a food photo (e.g., Pizza, Sandwich, Salad) and click **Scan Meal**.
+5. Drag and drop a food photo (like Grilled Chicken) and click **Scan Meal**.
 
 ---
 
 ## The Git Learning Curriculum
 
-This project uses Git for version control. Follow these steps in order to master Git commands:
+This project uses Git for version control. Here are the core commands to manage your repository:
 
-### Phase 1: Repository Initialization
-Initialize the folder as a Git repository and commit the base files on the `main` branch.
+### 1. Checking Your Status & Diffs
+Always run these to inspect what has changed before staging:
 ```bash
-# Initialize git
-git init
-
-# View status (you will see files in red)
+# Check modified and untracked files
 git status
 
-# Stage the base configuration files
-git add .gitignore requirements.txt README.md
-
-# Commit the files with a clear message
-git commit -m "initial: base structure, gitignore and documentation"
+# View line-by-line differences of modified files
+git diff
 ```
 
-### Phase 2: Branching to `dev`
-Always build features in a development branch (`dev`) rather than directly modifying production (`main`).
+### 2. Staging & Committing
+Save your changes locally in atomic, categorized commits:
 ```bash
-# Create a new branch named dev and switch to it
-git checkout -b dev
+# Stage a specific file
+git add README.md
 
-# List branches to verify
-git branch
+# Stage an entire folder
+git add frontend/
+
+# Commit with a descriptive message
+git commit -m "docs: update README.md features list"
 ```
 
-### Phase 3: Committing Features (Atomic Commits)
-Make incremental commits for each component.
+### 3. Branching
+Develop new features in development branches instead of main:
 ```bash
-# Stage the backend main file
-git add backend/main.py
-git commit -m "feat(backend): YOLOv8 & Gemini FastAPI pipeline"
+# Create and switch to a new branch
+git checkout -b feature-branch-name
 
-# Stage the frontend files
-git add frontend/index.html frontend/styles.css frontend/app.js
-git commit -m "feat(frontend): Cal.ai design and canvas bounding boxes"
+# Switch back to an existing branch
+git checkout main
 ```
 
-### Phase 4: History Inspection
-Inspect the history to see the graph of changes.
+### 4. Merging
+Integrate completed branch features into production:
 ```bash
-git log --oneline --graph --all
-```
-
-### Phase 5: Merging to Production (`main`)
-Merge the completed features back into the `main` branch.
-```bash
-# Switch back to the main branch
+# Switch to the target branch
 git checkout main
 
-# Merge the dev branch changes
-git merge dev
+# Merge the feature branch into main
+git merge feature-branch-name
+```
 
-# Verify history shows them integrated
-git log --oneline
+### 5. Pushing to GitHub
+Upload your local commits to your remote GitHub profile:
+```bash
+# Push commits for your active branch
+git push origin main
 ```
