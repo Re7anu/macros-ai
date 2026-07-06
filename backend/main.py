@@ -12,9 +12,9 @@ from ultralytics import YOLO
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("calorie-ai-backend")
+logger = logging.getLogger("macros-ai-backend")
 
-app = FastAPI(title="Calorie AI Backend")
+app = FastAPI(title="Macros AI Backend")
 
 # Enable CORS for frontend integration
 app.add_middleware(
@@ -54,14 +54,14 @@ async def detect_food(
     try:
         image_bytes = await file.read()
         image = Image.open(io.BytesIO(image_bytes))
-        # Ensure image is in RGB format for YOLO/PIL
+        # Ensure image is in RGB format
         if image.mode != "RGB":
             image = image.convert("RGB")
     except Exception as e:
         logger.error(f"Failed to process uploaded image: {e}")
         raise HTTPException(status_code=400, detail="Invalid image file.")
 
-    # 2. Run YOLOv8 Object Detection
+    # 2. Run YOLOv8 Object Detection to get initial candidate boxes
     try:
         results = model(image)
         detections = []
@@ -73,15 +73,15 @@ async def detect_food(
             cls_id = int(box.cls[0])
             label = model.names[cls_id]
             
-            # Format detection for frontend (relative percentage coords are easiest for canvas scaling)
+            # Format detection (relative coordinates)
             detections.append({
                 "label": label,
                 "confidence": conf,
                 "box": [
-                    x1 / img_width,   # x_min relative
-                    y1 / img_height,  # y_min relative
-                    x2 / img_width,   # x_max relative
-                    y2 / img_height   # y_max relative
+                    x1 / img_width,
+                    y1 / img_height,
+                    x2 / img_width,
+                    y2 / img_height
                 ]
             })
     except Exception as e:
@@ -91,33 +91,54 @@ async def detect_food(
     # 3. Retrieve Gemini API Key (header or env)
     api_key = x_gemini_key or os.environ.get("GEMINI_API_KEY")
     
-    nutrition_data = {
-        "calories": 0,
-        "protein": 0,
-        "carbs": 0,
-        "fat": 0,
-        "portion_size": "N/A",
-        "detected_foods": [d["label"] for d in detections if d["label"] in ["banana", "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake"]],
-        "insights": "Please set up your Gemini API Key in the settings to get real calorie estimation."
+    # Default fallback data if no Gemini key is provided
+    response_data = {
+        "detections": detections,
+        "nutrition": {
+            "calories": 0,
+            "protein": 0,
+            "carbs": 0,
+            "fat": 0,
+            "portion_size": "N/A",
+            "detected_foods": [d["label"] for d in detections],
+            "insights": "Please set up your Gemini API Key in the settings to run Gemini's smart correction and get real calorie estimation."
+        },
+        "api_key_configured": False
     }
 
-    # 4. If Gemini API Key is available, run multimodal inference
+    # 4. If Gemini API Key is available, run multimodal inference to correct YOLO's detections
     if api_key:
         try:
-            # Prepare prompt with YOLO helper context
-            yolo_labels = [d["label"] for d in detections]
+            # Direct Gemini Prompt for correction and calorie estimation
             prompt = f"""
-            Analyze this food image. YOLOv8 detected the following objects: {', '.join(yolo_labels)}.
-            Provide an accurate nutritional estimation for the food items visible in this image.
-            Return your response EXACTLY as a JSON object with the following fields:
+            You are an expert nutritionist and computer vision AI.
+            We ran a YOLOv8 model on this food image and got these raw detections:
+            {json.dumps(detections)}
+
+            Analyze the image and the YOLO detections:
+            1. Correct the labels of the bounding boxes to match the actual food items. (e.g. if a box is labeled 'pizza' or 'fork' but it contains 'grilled chicken', correct the label to 'Grilled Chicken').
+            2. Ignore boxes that contain only cutlery or empty plates (like forks, knives, tables) unless they contain food (like a bowl of ketchup/sauce).
+            3. Estimate the portion size, calories, protein (g), carbs (g), and fat (g) for the food items.
+            4. If you see food items that YOLO completely missed, you can add new bounding boxes for them (with coordinates as [x_min, y_min, x_max, y_max] from 0.0 to 1.0 relative to image size).
+
+            Return your response EXACTLY as a JSON object with the following structure:
             {{
-              "calories": integer,
-              "protein": integer, (in grams)
-              "carbs": integer, (in grams)
-              "fat": integer, (in grams)
-              "portion_size": "string describing the portion, e.g., '1 plate, approx 350g'",
-              "detected_foods": ["list of actual food items identified by you"],
-              "insights": "a short 1-2 sentence recommendation or tip about this meal"
+              "detections": [
+                {{
+                  "label": "Corrected Food Name (e.g. Grilled Chicken)",
+                  "confidence": 0.95,
+                  "box": [x_min, y_min, x_max, y_max]
+                }}
+              ],
+              "nutrition": {{
+                "calories": integer,
+                "protein": integer,
+                "carbs": integer,
+                "fat": integer,
+                "portion_size": "portion description (e.g. 2 pieces, approx 200g)",
+                "detected_foods": ["list of corrected food items"],
+                "insights": "a short 1-2 sentence recommendation or tip about this meal"
+              }}
             }}
             Do not include any markdown formatting (like ```json) in your response, just return the raw JSON object.
             """
@@ -152,19 +173,19 @@ async def detect_food(
             if response.status_code == 200:
                 result_json = response.json()
                 text_content = result_json["contents"][0]["parts"][0]["text"]
-                # Parse Gemini JSON response
-                nutrition_data = json.loads(text_content.strip())
+                
+                # Parse Gemini corrected JSON response
+                gemini_data = json.loads(text_content.strip())
+                response_data = {
+                    "detections": gemini_data.get("detections", []),
+                    "nutrition": gemini_data.get("nutrition", {}),
+                    "api_key_configured": True
+                }
             else:
                 logger.error(f"Gemini API returned status {response.status_code}: {response.text}")
-                nutrition_data["insights"] = "Gemini API error. Please check your API key."
+                response_data["nutrition"]["insights"] = "Gemini API error. Please check your API key."
         except Exception as e:
-            logger.error(f"Gemini API request failed: {e}")
-            nutrition_data["insights"] = f"Failed to get nutritional data: {str(e)}"
-    else:
-        logger.info("No Gemini API key provided. Returning YOLO detections with mock warning.")
+            logger.error(f"Gemini correction pipeline failed: {e}")
+            response_data["nutrition"]["insights"] = f"Failed to get nutritional data: {str(e)}"
 
-    return {
-        "detections": detections,
-        "nutrition": nutrition_data,
-        "api_key_configured": api_key is not None
-    }
+    return response_data
