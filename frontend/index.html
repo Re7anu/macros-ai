@@ -72,7 +72,12 @@
                 <div class="dashboard-panel glass left-panel">
                     <div class="panel-header">
                         <h2><i class="fa-solid fa-expand"></i> Food Scanner</h2>
-                        <span id="scan-status" class="status-badge offline">FastAPI Offline</span>
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <label style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;" title="Toggle between raw YOLOv8 local detections and Gemini-corrected labels">
+                                <input type="checkbox" id="toggle-yolo-mode" style="accent-color: var(--accent);"> Show Raw YOLO
+                            </label>
+                            <span id="scan-status" class="status-badge offline">FastAPI Offline</span>
+                        </div>
                     </div>
 
                     <!-- Drag & Drop Zone -->

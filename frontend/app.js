@@ -292,6 +292,10 @@ function resetImageUpload() {
 
 // --- YOLO & Gemini Processing ---
 function setupScanListeners() {
+    document.getElementById('toggle-yolo-mode').addEventListener('change', () => {
+        drawBoundingBoxes();
+    });
+    
     scanBtn.addEventListener('click', async () => {
         if (!state.selectedFile) return;
         
@@ -336,41 +340,8 @@ function setupScanListeners() {
 function handleScanSuccess(data) {
     state.scannedMeal = data;
     
-    // Redraw image and draw YOLO Bounding Boxes
-    const img = state.currentImgInstance;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    
-    // Draw Bounding Boxes
-    data.detections.forEach(det => {
-        const [xMinRel, yMinRel, xMaxRel, yMaxRel] = det.box;
-        const x = xMinRel * canvas.width;
-        const y = yMinRel * canvas.height;
-        const w = (xMaxRel - xMinRel) * canvas.width;
-        const h = (yMaxRel - yMinRel) * canvas.height;
-        
-        // Box outline
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x, y, w, h);
-        
-        // Semi-transparent box fill
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
-        ctx.fillRect(x, y, w, h);
-        
-        // Text tag label
-        ctx.fillStyle = '#10b981';
-        ctx.font = 'bold 11px var(--font-body)';
-        const labelText = `${det.label} (${Math.round(det.confidence * 100)}%)`;
-        const textWidth = ctx.measureText(labelText).width;
-        
-        ctx.fillStyle = 'rgba(9, 9, 11, 0.85)';
-        ctx.fillRect(x, y - 18, textWidth + 10, 18);
-        
-        ctx.fillStyle = '#10b981';
-        ctx.fillText(labelText, x + 5, y - 5);
-    });
+    // Draw Bounding Boxes on Canvas
+    drawBoundingBoxes();
     
     // Log meal data
     const nut = data.nutrition;
@@ -400,6 +371,53 @@ function handleScanSuccess(data) {
     
     // Auto-update first message of chat
     addCoachMessage(`I've analyzed your meal: ${mealName}. Total calories are around ${nut.calories || 0} kcal, with ${nut.protein || 0}g protein, ${nut.carbs || 0}g carbs, and ${nut.fat || 0}g fat. How can I help you customize this for your diet goals?`);
+}
+
+function drawBoundingBoxes() {
+    if (!state.scannedMeal || !state.currentImgInstance) return;
+    
+    const showRawYolo = document.getElementById('toggle-yolo-mode').checked;
+    const data = state.scannedMeal;
+    const img = state.currentImgInstance;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear and redraw image
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    
+    // Select which list to draw (raw_detections contains YOLOv8 outputs, detections contains Gemini corrected outputs)
+    const listToDraw = showRawYolo ? (data.raw_detections || []) : (data.detections || []);
+    const boxColor = showRawYolo ? '#ef4444' : '#10b981'; // Red/Coral for raw YOLO, Emerald green for corrected
+    const fillColor = showRawYolo ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+    
+    listToDraw.forEach(det => {
+        const [xMinRel, yMinRel, xMaxRel, yMaxRel] = det.box;
+        const x = xMinRel * canvas.width;
+        const y = yMinRel * canvas.height;
+        const w = (xMaxRel - xMinRel) * canvas.width;
+        const h = (yMaxRel - yMinRel) * canvas.height;
+        
+        // Box outline
+        ctx.strokeStyle = boxColor;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x, y, w, h);
+        
+        // Semi-transparent box fill
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(x, y, w, h);
+        
+        // Text tag label
+        ctx.fillStyle = boxColor;
+        ctx.font = 'bold 11px var(--font-body)';
+        const labelText = `${det.label} (${Math.round(det.confidence * 100)}%)`;
+        const textWidth = ctx.measureText(labelText).width;
+        
+        ctx.fillStyle = 'rgba(9, 9, 11, 0.85)';
+        ctx.fillRect(x, y - 18, textWidth + 10, 18);
+        
+        ctx.fillStyle = boxColor;
+        ctx.fillText(labelText, x + 5, y - 5);
+    });
 }
 
 function formatFoodNameList(list) {
