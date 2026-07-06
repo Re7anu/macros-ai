@@ -93,6 +93,7 @@ async def detect_food(
     
     # Default fallback data if no Gemini key is provided
     response_data = {
+        "raw_detections": detections,
         "detections": detections,
         "nutrition": {
             "calories": 0,
@@ -172,11 +173,12 @@ async def detect_food(
             
             if response.status_code == 200:
                 result_json = response.json()
-                text_content = result_json["contents"][0]["parts"][0]["text"]
+                text_content = result_json["candidates"][0]["content"]["parts"][0]["text"]
                 
                 # Parse Gemini corrected JSON response
                 gemini_data = json.loads(text_content.strip())
                 response_data = {
+                    "raw_detections": detections,
                     "detections": gemini_data.get("detections", []),
                     "nutrition": gemini_data.get("nutrition", {}),
                     "api_key_configured": True
