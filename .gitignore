@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pt
+.env
+.DS_Store
+.vscode/
+*.log
+runs/
+*.jpg
+*.jpeg
+*.png
+!frontend/assets/
