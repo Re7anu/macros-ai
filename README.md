@@ -1,4 +1,4 @@
-# Macros AI 🍳 (YOLOv8 + Gemini API Smart Nutrition Tracker)
+# Macros AI (YOLOv8 + Gemini API Smart Nutrition Tracker)
 
 Macros AI is a full-stack web application that combines computer vision and generative AI to locate food items on a plate, draw bounding boxes, and estimate nutritional metrics in real-time. It is inspired by the sleek design aesthetics of **Cal.ai** (dark mode, glassmorphism, responsive navigation).
 
