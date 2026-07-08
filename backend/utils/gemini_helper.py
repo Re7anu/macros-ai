@@ -4,9 +4,17 @@ import requests
 from typing import List, Dict, Any
 from backend.config.settings import settings
 from backend.utils.prompt import GEMINI_FOOD_CORRECTION_PROMPT
+from backend.schemas.gemini import (
+    GeminiRequestPayload,
+    GeminiResponse,
+    Content,
+    Part,
+    InlineData,
+    GenerationConfig
+)
 
 def build_gemini_payload(prompt: str, mime_type: str, image_b64: str) -> Dict[str, Any]:
-    """Constructs the JSON request body structure for the Gemini API multimodal request.
+    """Constructs the JSON request body structure for the Gemini API multimodal request using Pydantic.
     
     Args:
         prompt (str): The text instruction prompt.
@@ -14,26 +22,21 @@ def build_gemini_payload(prompt: str, mime_type: str, image_b64: str) -> Dict[st
         image_b64 (str): The base64-encoded image bytes.
         
     Returns:
-        Dict[str, Any]: The structured payload dictionary matching the Gemini REST API.
+        Dict[str, Any]: The validated structured payload dictionary.
     """
-    return {
-        "contents": [
-            {
-                "parts": [
-                    {"text": prompt},
-                    {
-                        "inlineData": {
-                            "mimeType": mime_type,
-                            "data": image_b64
-                        }
-                    }
+    payload = GeminiRequestPayload(
+        contents=[
+            Content(
+                parts=[
+                    Part(text=prompt),
+                    Part(inlineData=InlineData(mimeType=mime_type, data=image_b64))
                 ]
-            }
+            )
         ],
-        "generationConfig": {
-            "responseMimeType": "application/json"
-        }
-    }
+        generationConfig=GenerationConfig(responseMimeType="application/json")
+    )
+    # Using Pydantic V2 model_dump() for serialization to dict
+    return payload.model_dump()
 
 def query_gemini_correction(
     image_bytes: bytes,
@@ -52,16 +55,17 @@ def query_gemini_correction(
     Returns:
         Dict[str, Any]: Corrected food items, coordinates, and calorie/macro details.
     """
-    # Inline base64 encoding (helper function removed as requested by lead)
+    # Base64 encode the image
     encoded_image = base64.b64encode(image_bytes).decode('utf-8')
     
-    # Import system prompt template from separate prompts module
+    # Format the prompt
     prompt = GEMINI_FOOD_CORRECTION_PROMPT.format(raw_detections=json.dumps(raw_detections))
     
-    # Build payload using helper function
+    # Build payload using Pydantic helper
     payload = build_gemini_payload(prompt, content_type, encoded_image)
     
-    url = f"{settings.GEMINI_API_URL}?key={api_key}"
+    # Dynamic URL formatting
+    url = f"{settings.get_gemini_url()}?key={api_key}"
     headers = {"Content-Type": "application/json"}
     
     response = requests.post(url, json=payload, headers=headers)
@@ -69,6 +73,11 @@ def query_gemini_correction(
     if response.status_code != 200:
         raise Exception(f"Gemini API returned status {response.status_code}: {response.text}")
         
-    result_json = response.json()
-    text_content = result_json["candidates"][0]["content"]["parts"][0]["text"]
+    response_json = response.json()
+    
+    # Validate and parse the Gemini API response structure using Pydantic
+    gemini_resp = GeminiResponse.model_validate(response_json)
+    
+    # Extract corrected response string safely using typed Pydantic attributes
+    text_content = gemini_resp.candidates[0].content.parts[0].text
     return json.loads(text_content.strip())
