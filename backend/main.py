@@ -64,39 +64,31 @@ async def detect_food(
         raw_detections = []
     
     api_key = x_gemini_key or os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Gemini API Key is missing. Please configure it in the Settings panel (⚙️) before scanning."
+        )
     
-    # Default fallback response
-    response_data = {
-        "raw_detections": raw_detections,
-        "detections": raw_detections,
-        "nutrition": {
-            "calories": 0,
-            "protein": 0,
-            "carbs": 0,
-            "fat": 0,
-            "portion_size": "N/A",
-            "detected_foods": [d["label"] for d in raw_detections],
-            "insights": "Please set up your Gemini API Key in the settings to run Gemini's smart correction and get real calorie estimation."
-        },
-        "api_key_configured": False
-    }
-    
-    if api_key:
-        try:
-            gemini_result = query_gemini_correction(
-                image_bytes=image_bytes,
-                content_type=file.content_type or "image/jpeg",
-                raw_detections=raw_detections,
-                api_key=api_key
-            )
-            response_data = {
-                "raw_detections": raw_detections,
-                "detections": gemini_result.get("detections", []),
-                "nutrition": gemini_result.get("nutrition", {}),
-                "api_key_configured": True
-            }
-        except Exception as e:
-            logger.error(f"Gemini correction pipeline failed: {e}")
-            response_data["nutrition"]["insights"] = f"Failed to get nutritional data: {str(e)}"
+    # Run Gemini correction pipeline
+    try:
+        gemini_result = query_gemini_correction(
+            image_bytes=image_bytes,
+            content_type=file.content_type or "image/jpeg",
+            raw_detections=raw_detections,
+            api_key=api_key
+        )
+        response_data = {
+            "raw_detections": raw_detections,
+            "detections": gemini_result.get("detections", []),
+            "nutrition": gemini_result.get("nutrition", {}),
+            "api_key_configured": True
+        }
+    except Exception as e:
+        logger.error(f"Gemini correction pipeline failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gemini correction pipeline failed: {str(e)}"
+        )
             
     return response_data
