@@ -320,14 +320,20 @@ function setupScanListeners() {
             });
             
             if (!response.ok) {
-                throw new Error(`Server returned error ${response.status}`);
+                const errorData = await response.json().catch(() => ({}));
+                const errMsg = errorData.detail || `Server returned error ${response.status}`;
+                throw new Error(errMsg);
             }
             
             const data = await response.json();
             handleScanSuccess(data);
         } catch (err) {
             console.error(err);
-            alert(`Scanning failed: ${err.message}. Please check if the FastAPI backend is running.`);
+            if (err.message.includes('Failed to fetch') || err.message.includes('fetch')) {
+                alert('Scanning failed: Unable to connect to the backend. Please check if the FastAPI server is running.');
+            } else {
+                alert(`Scanning failed: ${err.message}`);
+            }
         } finally {
             // Reset scan line animation and buttons
             scanLine.style.display = 'none';
