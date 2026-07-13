@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 class Settings(BaseModel):
     """Application configuration settings and model thresholds validated with Pydantic."""
     
-    YOLO_MODEL_PATH: str = "yolov8n.pt"
+    YOLO_MODEL_PATH: str = "yolov8n-seg.pt"
     YOLO_CONF_THRESHOLD: float = Field(0.40, ge=0.0, le=1.0, description="Confidence threshold for YOLOv8 (0.0 to 1.0)")
     GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
     GEMINI_API_URL: str = "https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
