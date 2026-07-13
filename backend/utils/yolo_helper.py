@@ -26,20 +26,30 @@ def run_yolo_inference(model: YOLO, image: Image.Image) -> List[Dict[str, Any]]:
     results = model(image, conf=settings.YOLO_CONF_THRESHOLD)
     detections = []
     
-    for box in results[0].boxes:
-        x1, y1, x2, y2 = box.xyxy[0].tolist()
-        conf = float(box.conf[0])
-        cls_id = int(box.cls[0])
-        label = model.names[cls_id]
-        
-        detections.append({
-            "label": label,
-            "confidence": conf,
-            "box": [
-                x1 / img_width,
-                y1 / img_height,
-                x2 / img_width,
-                y2 / img_height
-            ]
-        })
+    # Check if segmentation masks are present in results
+    masks = results[0].masks
+    boxes = results[0].boxes
+    
+    if boxes is not None:
+        for i, box in enumerate(boxes):
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            conf = float(box.conf[0])
+            cls_id = int(box.cls[0])
+            label = model.names[cls_id]
+            
+            segments_coords = None
+            if masks is not None and masks.xyn is not None and len(masks.xyn) > i:
+                segments_coords = masks.xyn[i].tolist()
+            
+            detections.append({
+                "label": label,
+                "confidence": conf,
+                "box": [
+                    x1 / img_width,
+                    y1 / img_height,
+                    x2 / img_width,
+                    y2 / img_height
+                ],
+                "segments": segments_coords
+            })
     return detections

@@ -14,18 +14,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install dependencies
+# Copy requirements and install dependencies using CPU-only PyTorch index as primary (prevents heavy CUDA downloads)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple -r requirements.txt
 
-# Pre-download YOLOv8 weights into the build image to optimize container startup time
-RUN python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+# Pre-download YOLOv8 segmentation weights into the build image to optimize container startup time
+RUN python -c "from ultralytics import YOLO; YOLO('yolov8n-seg.pt')"
 
 # Copy backend code
 COPY backend/ ./backend/
-
-# Copy the downloaded model weights to the container app root
-COPY yolov8n.pt .
 
 # Expose port
 EXPOSE 8000

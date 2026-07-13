@@ -52,16 +52,39 @@ export function drawBoundingBoxes() {
         const w = (xMaxRel - xMinRel) * canvas.width;
         const h = (yMaxRel - yMinRel) * canvas.height;
         
-        // Box outline
-        ctx.strokeStyle = boxColor;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x, y, w, h);
+        // Draw segment outline/fill if polygon points are available
+        if (det.segments && det.segments.length > 0) {
+            ctx.beginPath();
+            const startX = det.segments[0][0] * canvas.width;
+            const startY = det.segments[0][1] * canvas.height;
+            ctx.moveTo(startX, startY);
+            
+            for (let j = 1; j < det.segments.length; j++) {
+                const px = det.segments[j][0] * canvas.width;
+                const py = det.segments[j][1] * canvas.height;
+                ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            
+            // Draw segment outline
+            ctx.strokeStyle = boxColor;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Draw semi-transparent segment fill
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+        } else {
+            // Fallback: draw normal bounding box outline and fill
+            ctx.strokeStyle = boxColor;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(x, y, w, h);
+            
+            ctx.fillStyle = fillColor;
+            ctx.fillRect(x, y, w, h);
+        }
         
-        // Semi-transparent box fill
-        ctx.fillStyle = fillColor;
-        ctx.fillRect(x, y, w, h);
-        
-        // Text tag label
+        // Draw text tag label at the top-left of the object boundary
         ctx.fillStyle = boxColor;
         ctx.font = 'bold 11px var(--font-body)';
         const labelText = `${det.label} (${Math.round(det.confidence * 100)}%)`;
